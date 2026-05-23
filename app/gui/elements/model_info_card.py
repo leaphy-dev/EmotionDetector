@@ -2,7 +2,7 @@ from enum import Enum
 
 from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout
 from qfluentwidgets import BodyLabel, IconWidget, InfoBarIcon, HeaderCardWidget, PrimaryPushButton, \
-    CheckBox, IndeterminateProgressBar, SpinBox
+    CheckBox, IndeterminateProgressBar, SpinBox, ProgressBar
 
 
 class ModelStatus(int, Enum):
@@ -22,8 +22,9 @@ class ModelInfo(HeaderCardWidget):
         self.setTitle(model_name)
         self.descriptionLabel = BodyLabel(self.model_data.get("description", ""), self)
         self.statusIcon = IconWidget(InfoBarIcon.SUCCESS, self)
-        self.inProgressBar = IndeterminateProgressBar(self)
-        self.inProgressBar.stop()
+        self.process_bar = ProgressBar(self)
+        self.process_bar.setValue(100)
+        # self.process_bar.stop()
         self.statusLabel = BodyLabel('Ready', self)
 
         self.epochsLabel = BodyLabel('训练轮数:', self)
@@ -31,7 +32,7 @@ class ModelInfo(HeaderCardWidget):
         self.epochsSpinBox.setRange(1, 1000)
         self.epochsSpinBox.setValue(5)
         self.epochsSpinBox.setSuffix(' 轮')
-        self.epochsSpinBox.setFixedWidth(100)
+        # self.epochsSpinBox.setFixedWidth(100)
 
         # 训练按钮
         self.trainButton = PrimaryPushButton('开始训练', self)
@@ -77,7 +78,7 @@ class ModelInfo(HeaderCardWidget):
 
         self.vBoxLayout.addWidget(self.descriptionLabel)
         self.vBoxLayout.addLayout(self.statusLayout)
-        self.vBoxLayout.addWidget(self.inProgressBar)
+        self.vBoxLayout.addWidget(self.process_bar)
         self.vBoxLayout.addLayout(self.epochsLayout)
         self.vBoxLayout.addLayout(self.buttonLayout)
         self.vBoxLayout.addLayout(self.forceLayout)  # 添加force复选框行
@@ -97,17 +98,19 @@ class ModelInfo(HeaderCardWidget):
     def set_train_button_visible(self, visible: bool):
         self.trainButton.setVisible(visible)
 
-    def set_status(self, status: int = 0):
+    def set_status(self, status: int = ModelStatus.OK):
         if status == ModelStatus.OK:
             self.set_train_button_enabled(True)
             self.forceCheckBox.setEnabled(True)
-            self.inProgressBar.stop()
+            # self.process_bar.stop()
+            self.process_bar.setValue(100)
             self.statusIcon.setIcon(InfoBarIcon.SUCCESS)
             self.statusLabel.setText("Ready")
             self.model_status = ModelStatus.OK
 
         elif status == ModelStatus.PROCESSING:
-            self.inProgressBar.start()
+            # self.process_bar.start()
+            self.process_bar.setValue(0)
             self.set_train_button_enabled(False)
             self.forceCheckBox.setEnabled(False)
             self.statusIcon.setIcon(InfoBarIcon.INFORMATION)
@@ -117,7 +120,8 @@ class ModelInfo(HeaderCardWidget):
         else:
             self.set_train_button_enabled(True)
             self.forceCheckBox.setEnabled(True)
-            self.inProgressBar.stop()
+            # self.process_bar.stop()
+            self.process_bar.setValue(0)
             self.statusIcon.setIcon(InfoBarIcon.ERROR)
             self.statusLabel.setText("Error")
             self.model_status = ModelStatus.ERROR

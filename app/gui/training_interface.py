@@ -15,22 +15,23 @@ class TrainWorker(QThread):
     finished = pyqtSignal()
     error = pyqtSignal(str)
 
-    def __init__(self, model_op, model_class, model_path, epochs, force):
+    def __init__(self, func, model_class, model_path, epochs, force, process_callback):
         super().__init__()
-        self.model_op = model_op
+        self.func = func
         self.model_class = model_class
         self.model_path = model_path
         self.epochs = epochs
         self.force = force
+        self.process_callback = process_callback
 
     def run(self):
         try:
-            train_func: Callable = self.model_op.train_model
-            train_func(
+            self.func(
                 self.model_class,
                 self.model_path,
                 self.epochs,
-                self.force
+                self.force,
+                self.process_callback
             )
             self.finished.emit()
         except Exception as e:
@@ -77,11 +78,12 @@ class TrainingInterface(QFrame):
 
         model_op = getattr(self._entry_widget, "model_op")
         train_worker = TrainWorker(
-            model_op,
+            model_op.train_model,
             model_card_widget.model_data["class"],
             model_card_widget.model_data["path"],
             model_card_widget.get_epochs(),
-            model_card_widget.get_force()
+            model_card_widget.get_force(),
+            model_card_widget.process_bar.setValue
         )
 
         model_card_widget.worker = train_worker
@@ -104,7 +106,7 @@ class TrainingInterface(QFrame):
 
         )
         model_card_widget.set_status(status=ModelStatus.OK)
-        self.logger.info(f"模型 {model_card_widget.model_data['class']} 训练完成")
+        self.logger.info(f"模型 {model_card_widget.model_data['class'].NAME} 训练完成")
 
     def on_train_error(self, model_card_widget: ModelInfo, error_msg: str):
         InfoBar.error(

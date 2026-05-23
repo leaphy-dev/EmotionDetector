@@ -61,14 +61,15 @@ class ModelOperator:
                     model_class,
                     model_path: str = "./model_data/emotion_model.pth",
                     epochs=5,
-                    force:bool=False):
+                    force:bool=False,
+                    process_callback = None):
 
         model_path: Path = Path(model_path)
 
         if model_path.exists() and not force:
             self._logger.info(f"模型文件{model_path}存在，跳过")
             return None
-        name = hasattr(model_class, "NAME", "")
+        name = getattr(model_class, "NAME", "")
         self._logger.info(f'开始训练: {name}...')
 
 
@@ -113,6 +114,9 @@ class ModelOperator:
                     correct += predicted.eq(labels).sum().item()
 
             test_acc = 100. * correct / total
+
+            if process_callback:
+                process_callback(int(((epoch+1)/epochs)*100))
 
             self._logger.info(f'{name}: Epoch {epoch + 1}/{epochs} | Loss: {running_loss / len(train_loader):.4f} | '
                   f'Train Acc: {train_acc:.2f}% | Test Acc: {test_acc:.2f}%')
