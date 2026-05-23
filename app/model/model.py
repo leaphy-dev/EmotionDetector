@@ -8,6 +8,8 @@ class EmotionCNNModel1(nn.Module):
         FC1: 9216 -> 128 (ReLU)
         FC2: 128 -> 7 (输出7类情感)
     """
+    NAME = "EmotionCNN Model 1"
+
     def __init__(self):
         super().__init__()
         # 卷积层: 输入1x48x48 -> 32x24x24
@@ -45,6 +47,8 @@ class EmotionCNNModel2(nn.Module):
         FC2: 512 -> 256 (ReLU + Dropout 0.5)
         FC3: 256 -> 7 (输出7类情感)
     """
+    NAME = "EmotionCNN Model 2"
+
     def __init__(self):
         super().__init__()
         # 更深层的卷积网络，增加dropout防止过拟合
@@ -100,6 +104,7 @@ class EmotionCNNModel3(nn.Module):
         Global Average Pooling: 128x1x1
         FC: 128 -> 7 (输出7类情感)
     """
+    NAME = "EmotionCNN Model 3"
     def __init__(self):
         super().__init__()
         # 使用更大的卷积核和不同的架构（类似VGG风格）

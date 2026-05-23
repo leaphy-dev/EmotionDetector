@@ -68,8 +68,8 @@ class ModelOperator:
         if model_path.exists() and not force:
             self._logger.info(f"模型文件{model_path}存在，跳过")
             return None
-
-        self._logger.info(f'开始训练... model_data: {model_class}')
+        name = hasattr(model_class, "NAME", "")
+        self._logger.info(f'开始训练: {name}...')
 
 
         model_class = model_class().to(self.device)
@@ -114,7 +114,7 @@ class ModelOperator:
 
             test_acc = 100. * correct / total
 
-            self._logger.info(f'Epoch {epoch + 1}/{epochs} | Loss: {running_loss / len(train_loader):.4f} | '
+            self._logger.info(f'{name}: Epoch {epoch + 1}/{epochs} | Loss: {running_loss / len(train_loader):.4f} | '
                   f'Train Acc: {train_acc:.2f}% | Test Acc: {test_acc:.2f}%')
 
         if not model_path.parent.exists():
@@ -128,7 +128,7 @@ class ModelOperator:
 
     def load_model(self, model_class, model_path='emotion_model.pth'):
         if os.path.exists(model_path):
-            self._logger.info('加载已训练模型...')
+            self._logger.info(f'加载已训练模型: "{model_path}"...')
             model_instance = model_class().to(self.device)
             model_instance.load_state_dict(torch.load(model_path, map_location=self.device))
             model_instance.eval()

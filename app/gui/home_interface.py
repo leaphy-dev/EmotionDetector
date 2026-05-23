@@ -1,14 +1,16 @@
-import logging
+#home_interface.py
 import os
+from typing import List
 
 import cv2
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QFileDialog
-from qfluentwidgets import SubtitleLabel, setFont, PushButton, TeachingTip, InfoBarIcon, TeachingTipTailPosition, \
-    InfoBar, InfoBarPosition, PrimaryPushButton
+from qfluentwidgets import PushButton, TeachingTip, InfoBarIcon, TeachingTipTailPosition, \
+    InfoBar, InfoBarPosition, PrimaryPushButton, IndeterminateProgressBar, ComboBox
 
 from .elements.scroll_image import ScrollImage
+
 
 class HomeInterface(QFrame):
 
@@ -20,6 +22,10 @@ class HomeInterface(QFrame):
 
         self.logger = getattr(parent, "logger")
 
+        #进度条
+        self.in_progress_bar = IndeterminateProgressBar(self)
+        self.in_progress_bar.stop()
+
         # 图片显示
         self.image_label = ScrollImage()
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -29,8 +35,18 @@ class HomeInterface(QFrame):
         # 结果显示
         self.result_label = QLabel()
         self.result_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.result_label.setStyleSheet("font-size: 20px; font-weight: bold; padding: 10px;")
+        self.result_label.setStyleSheet("font-size: 20px; font-weight: bold; padding: 10px; color: black;")
         self.vBoxLayout.addWidget(self.result_label)
+
+        self.model_selection_comboBox = ComboBox(self)
+        self.model_selection_comboBox.setPlaceholderText("Select a model.")
+
+        items: List = list(getattr(self._entry_widget, "model_configs", []).keys())
+        self.model_selection_comboBox.addItems(items)
+        self.model_selection_comboBox.setCurrentIndex(-1)
+        self.model_selection_comboBox.currentTextChanged.connect(self.switch_model)
+        self.vBoxLayout.addWidget(self.model_selection_comboBox)
+
         btn_layout = QHBoxLayout()
 
         self.open_btn = PushButton('打开图片')
@@ -43,13 +59,30 @@ class HomeInterface(QFrame):
         self.vBoxLayout.addLayout(btn_layout)
 
         self.open_btn.clicked.connect(self.open_image)
-        self.predict_btn.clicked.connect(self.predict)
+        def _start_predict():
+            try:
+                self.in_progress_bar.start()
+                self.predict()
+            finally:
+                self.in_progress_bar.stop()
+        self.predict_btn.clicked.connect(_start_predict)
         self.clear_btn.clicked.connect(self.clear)
 
         # 必须给子界面设置全局唯一的对象名
         self.setObjectName(text.replace(' ', '-'))
 
         self.current_img = ""
+
+    def switch_model(self, model_name: str):
+        InfoBar.info(
+            title="INFO",
+            content=f"Switching model to '{model_name}'",
+            position=InfoBarPosition.TOP,
+            parent=self
+        )
+
+        if switch_model := getattr(self._entry_widget, 'switch_predicting_model', None):
+            switch_model(model_name)
 
     def open_image(self):
         file_picker = QFileDialog()
@@ -64,6 +97,23 @@ class HomeInterface(QFrame):
             self.image_label.setPixmap(image)
 
     def predict(self):
+        self.in_progress_bar.start()
+
+        if (not getattr(self._entry_widget, 'current_model', None) or
+            not hasattr(self._entry_widget, 'model_op')):
+            TeachingTip.create(
+                target=self.model_selection_comboBox,
+                icon=InfoBarIcon.ERROR,
+                title='ERROR',
+                content="模型未加载，请先加载模型",
+                isClosable=True,
+                tailPosition=TeachingTipTailPosition.BOTTOM,
+                duration=2000,
+                parent=self
+            )
+            self.logger.info("模型未加载，请先加载模型")
+            return
+
         if not self.current_img:
             TeachingTip.create(
                 target=self.predict_btn,
@@ -89,20 +139,6 @@ class HomeInterface(QFrame):
                 parent=self
             )
             self.logger.info("无效的图片路径")
-            return
-
-        if not hasattr(self._entry_widget, 'current_model') or not hasattr(self._entry_widget, 'model_op'):
-            TeachingTip.create(
-                target=self.predict_btn,
-                icon=InfoBarIcon.ERROR,
-                title='ERROR',
-                content="模型未加载，请先加载模型",
-                isClosable=True,
-                tailPosition=TeachingTipTailPosition.BOTTOM,
-                duration=2000,
-                parent=self
-            )
-            self.logger.info("模型未加载，请先加载模型")
             return
 
         try:
@@ -148,7 +184,9 @@ class HomeInterface(QFrame):
                     parent = self
 
                 )
-                self.result_label.setText(f"识别结果: {result}")
+                emotions = ['愤怒', '厌恶', '恐惧', '高兴', '悲伤', '惊讶', '中性']
+                key = max(result,key=result.get)
+                self.result_label.setText(f"识别结果: {emotions[key]}({result[key]:.2%})")
             else:
                 InfoBar.error(
                     title="ERROR",
