@@ -39,15 +39,28 @@ class ModelOperator:
         if torch.cuda.is_available():
             self._logger.info(str(subprocess.run("nvidia-smi -L", capture_output=True, text=True).stdout))
 
-    def load_data(self,
-        batch_size=64):
-        transform = transforms.Compose([
+    def load_data(self, batch_size=64, use_augmentation=False):
+        if use_augmentation:
+            train_transform = transforms.Compose([
+                transforms.RandomHorizontalFlip(p=0.5),
+                transforms.RandomRotation(10),
+                transforms.RandomAffine(0, translate=(0.1, 0.1)),
+                transforms.ToTensor(),
+                transforms.Normalize((0.5,), (0.5,))
+            ])
+        else:
+            train_transform = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.5,), (0.5,))
+            ])
+
+        test_transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.5,), (0.5,))
         ])
 
-        train_data = datasets.FER2013(root='./dataset', split='train', transform=transform)
-        test_data = datasets.FER2013(root='./dataset', split='test', transform=transform)
+        train_data = datasets.FER2013(root='./dataset', split='train', transform=train_transform)
+        test_data = datasets.FER2013(root='./dataset', split='test', transform=test_transform)
 
         train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
         test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False)
@@ -61,35 +74,48 @@ class ModelOperator:
                     model_class,
                     model_path: str = "./model_data/emotion_model.pth",
                     epochs=5,
-                    force:bool=False,
-                    process_callback = None):
+                    force: bool = False,
+                    process_callback=None,
+                    use_augmentation=True,
+                    use_class_weights=False):
 
         model_path: Path = Path(model_path)
 
         if model_path.exists() and not force:
             self._logger.info(f"模型文件{model_path}存在，跳过")
             return None
+
         name = getattr(model_class, "NAME", "")
         self._logger.info(f'开始训练: {name}...')
 
+        model_instance = model_class().to(self.device)
 
-        model_class = model_class().to(self.device)
-        criterion = nn.CrossEntropyLoss()
-        optimizer = optim.Adam(model_class.parameters(), lr=0.001)
+        if use_class_weights:
+            class_counts = [4983, 547, 5121, 8989, 6077, 4002, 6198]
+            class_weights = torch.tensor([1.0 / c for c in class_counts])
+            class_weights = class_weights / class_weights.sum() * 7
+            class_weights = class_weights.to(self.device)
+            criterion = nn.CrossEntropyLoss(weight=class_weights)
+            self._logger.info(f'使用类别权重训练')
+        else:
+            criterion = nn.CrossEntropyLoss()
 
-        train_loader, test_loader = self.load_data()
+        optimizer = optim.Adam(model_instance.parameters(), lr=0.001)
+        train_loader, test_loader = self.load_data(use_augmentation=use_augmentation)
+
+        best_test_acc = 0
+        best_model_state = None  # 存内存里
 
         for epoch in range(epochs):
-            model_class.train()
+            model_instance.train()
             running_loss = 0.0
             correct = 0
             total = 0
 
             for images, labels in train_loader:
                 images, labels = images.to(self.device), labels.to(self.device)
-
                 optimizer.zero_grad()
-                outputs = model_class(images)
+                outputs = model_instance(images)
                 loss = criterion(outputs, labels)
                 loss.backward()
                 optimizer.step()
@@ -102,13 +128,13 @@ class ModelOperator:
             train_acc = 100. * correct / total
 
             # 测试
-            model_class.eval()
+            model_instance.eval()
             correct = 0
             total = 0
             with torch.no_grad():
                 for images, labels in test_loader:
                     images, labels = images.to(self.device), labels.to(self.device)
-                    outputs = model_class(images)
+                    outputs = model_instance(images)
                     _, predicted = outputs.max(1)
                     total += labels.size(0)
                     correct += predicted.eq(labels).sum().item()
@@ -116,26 +142,36 @@ class ModelOperator:
             test_acc = 100. * correct / total
 
             if process_callback:
-                process_callback(int(((epoch+1)/epochs)*100))
+                process_callback(int(((epoch + 1) / epochs) * 100))
 
             self._logger.info(f'{name}: Epoch {epoch + 1}/{epochs} | Loss: {running_loss / len(train_loader):.4f} | '
-                  f'Train Acc: {train_acc:.2f}% | Test Acc: {test_acc:.2f}%')
+                              f'Train Acc: {train_acc:.2f}% | Test Acc: {test_acc:.2f}%')
 
-        if not model_path.parent.exists():
-            model_path.parent.mkdir()
+            if test_acc > best_test_acc:
+                best_test_acc = test_acc
+                # 深拷贝模型参数到内存
+                best_model_state = {k: v.cpu().clone() for k, v in model_instance.state_dict().items()}
+                self._logger.info(f'{name}:更新最佳模型，ACC: {test_acc:.2f}%')
 
-        torch.save(model_class.state_dict(), model_path)
-        self._logger.info(f'模型已保存为 {model_path}')
+        if best_model_state is not None:
+            if not model_path.parent.exists():
+                model_path.parent.mkdir(parents=True, exist_ok=True)
+            torch.save(best_model_state, model_path)
+            self._logger.info(f'{name}:训练完成，保存最佳模型到 {model_path}，ACC: {best_test_acc:.2f}%')
+        else:
+            # 没有更好的模型保存最后一个
+            torch.save(model_instance.state_dict(), model_path)
+            self._logger.info(f'{name}:训练完成，保存最终模型到 {model_path}')
 
-        return model_class
+        return model_instance
 
 
     def load_model(self, model_class, model_path='emotion_model.pth'):
         if os.path.exists(model_path):
-            self._logger.info(f'加载已训练模型: "{model_path}"...')
             model_instance = model_class().to(self.device)
             model_instance.load_state_dict(torch.load(model_path, map_location=self.device))
             model_instance.eval()
+            self._logger.info(f'加载已训练模型: "{model_path}"...')
             return model_instance
         else:
             self._logger.info(f'未找到模型文件 {model_path}')

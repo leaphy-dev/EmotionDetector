@@ -1,8 +1,7 @@
 #training_interface.py
-import multiprocessing
 import traceback
 from pathlib import Path
-from typing import Dict, Callable
+from typing import Dict
 
 from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtWidgets import QFrame, QHBoxLayout
@@ -14,15 +13,18 @@ from .elements.model_info_card import ModelInfo, ModelStatus
 class TrainWorker(QThread):
     finished = pyqtSignal()
     error = pyqtSignal(str)
+    progress = pyqtSignal(int)
 
-    def __init__(self, func, model_class, model_path, epochs, force, process_callback):
+    def __init__(self, func, model_class, model_path, epochs, force):
         super().__init__()
         self.func = func
         self.model_class = model_class
         self.model_path = model_path
         self.epochs = epochs
         self.force = force
-        self.process_callback = process_callback
+
+    def progress_callback(self, progress: int):
+        self.progress.emit(progress)
 
     def run(self):
         try:
@@ -31,7 +33,7 @@ class TrainWorker(QThread):
                 self.model_path,
                 self.epochs,
                 self.force,
-                self.process_callback
+                self.progress_callback
             )
             self.finished.emit()
         except Exception as e:
@@ -82,9 +84,9 @@ class TrainingInterface(QFrame):
             model_card_widget.model_data["class"],
             model_card_widget.model_data["path"],
             model_card_widget.get_epochs(),
-            model_card_widget.get_force(),
-            model_card_widget.process_bar.setValue
+            model_card_widget.get_force()
         )
+        train_worker.progress.connect(model_card_widget.process_bar.setValue)
 
         model_card_widget.worker = train_worker
 

@@ -2,7 +2,7 @@ from enum import Enum
 
 from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout
 from qfluentwidgets import BodyLabel, IconWidget, InfoBarIcon, HeaderCardWidget, PrimaryPushButton, \
-    CheckBox, IndeterminateProgressBar, SpinBox, ProgressBar
+    CheckBox, SpinBox, ProgressBar, FluentIcon
 
 
 class ModelStatus(int, Enum):
@@ -21,6 +21,7 @@ class ModelInfo(HeaderCardWidget):
 
         self.setTitle(model_name)
         self.descriptionLabel = BodyLabel(self.model_data.get("description", ""), self)
+        self.descriptionLabel.setWordWrap(True)
         self.statusIcon = IconWidget(InfoBarIcon.SUCCESS, self)
         self.process_bar = ProgressBar(self)
         self.process_bar.setValue(100)
@@ -30,12 +31,13 @@ class ModelInfo(HeaderCardWidget):
         self.epochsLabel = BodyLabel('训练轮数:', self)
         self.epochsSpinBox = SpinBox(self)
         self.epochsSpinBox.setRange(1, 1000)
-        self.epochsSpinBox.setValue(5)
-        self.epochsSpinBox.setSuffix(' 轮')
+        self.epochsSpinBox.setValue(50)
+        self.epochsSpinBox.setSuffix(' Epoch(s)')
         # self.epochsSpinBox.setFixedWidth(100)
 
         # 训练按钮
-        self.trainButton = PrimaryPushButton('开始训练', self)
+        self.trainButton = PrimaryPushButton(text='开始训练', parent=self)
+        self.trainButton.setIcon(FluentIcon.BASKETBALL)
 
         # force复选框
         self.forceCheckBox = CheckBox('强制训练 (覆盖已有模型)', self)

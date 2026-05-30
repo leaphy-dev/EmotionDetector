@@ -1,5 +1,4 @@
 import sys
-import torch # type: ignore
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication
 
@@ -12,5 +11,5 @@ if __name__ == '__main__':
     QApplication.setAttribute(Qt.ApplicationAttribute.AA_DontCreateNativeWidgetSiblings)
     app = QApplication(sys.argv)
     window = EmotionDetectorUI()
-    window.show()
+    # window.show()
     sys.exit(app.exec())
