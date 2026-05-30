@@ -47,8 +47,6 @@ class TrainingInterface(QFrame):
 
         self._entry_widget = parent
 
-        self.logger = getattr(parent, "logger")
-
         models: Dict = getattr(self._entry_widget, "model_configs", {})
 
         self.model_card_list = []
@@ -66,6 +64,18 @@ class TrainingInterface(QFrame):
 
         self.setObjectName(text.replace(' ', '-'))
 
+    @property
+    def current_model(self):
+        return getattr(self._entry_widget, 'current_model', None)
+
+    @property
+    def model_op(self):
+        return getattr(self._entry_widget, 'model_op', None)
+
+    @property
+    def logger(self):
+        return getattr(self._entry_widget, "logger", None)
+
     def train_model(self, model_card_widget: ModelInfo):
         if Path(model_card_widget.model_data["path"]).exists() and not model_card_widget.get_force():
             InfoBar.warning(
@@ -78,9 +88,8 @@ class TrainingInterface(QFrame):
 
         model_card_widget.set_status(ModelStatus.PROCESSING)
 
-        model_op = getattr(self._entry_widget, "model_op")
         train_worker = TrainWorker(
-            model_op.train_model,
+            self.model_op.train_model,
             model_card_widget.model_data["class"],
             model_card_widget.model_data["path"],
             model_card_widget.get_epochs(),
