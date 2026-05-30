@@ -3,27 +3,29 @@ import os
 import sys
 import traceback
 from io import StringIO
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 import cv2
 import matplotlib
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QPixmap, QImage
+from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QFileDialog
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 
 matplotlib.use('QtAgg')
-matplotlib.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'WenQuanYi Micro Hei']
+matplotlib.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'WenQuanYi Micro Hei'] # 不然不支持中文
 matplotlib.rcParams['axes.unicode_minus'] = False
 
 original_stdout = sys.stdout
 sys.stdout = StringIO()
 from qfluentwidgets import PushButton, TeachingTip, InfoBarIcon, TeachingTipTailPosition, \
-    InfoBar, InfoBarPosition, PrimaryPushButton, IndeterminateProgressBar, ComboBox
+    InfoBar, InfoBarPosition, PrimaryPushButton, IndeterminateProgressBar, ComboBox, ToolButton, FluentIcon
+
 sys.stdout = original_stdout
 
 from .elements.scroll_image import ScrollImage
+from .elements.camera_capture import CameraDialog
 
 
 class PredictingWorker(QThread):
@@ -193,15 +195,18 @@ class HomeInterface(QFrame):
         btn_layout = QHBoxLayout()
 
         self.open_btn = PushButton(text='打开图片')
+        self.cam_btn = ToolButton(FluentIcon.CAMERA,self)
         self.predict_btn = PrimaryPushButton(text='开始识别')
         self.clear_btn = PushButton(text='Clear')
 
         btn_layout.addWidget(self.open_btn)
+        btn_layout.addWidget(self.cam_btn)
         btn_layout.addWidget(self.predict_btn)
         btn_layout.addWidget(self.clear_btn)
         self.vBoxLayout.addLayout(btn_layout)
 
         self.open_btn.clicked.connect(self.open_image)
+        self.cam_btn.clicked.connect(self.camera_capture)
         self.predict_btn.clicked.connect(self.predict)
         self.clear_btn.clicked.connect(self.clear)
 
@@ -324,8 +329,22 @@ class HomeInterface(QFrame):
                 parent=self
             )
 
+    def camera_capture(self):
+        window = CameraDialog(parent=self)
+        window.captured.connect(self.set_current_img)
+        window.show()
+
+    def _camera_capture_error(self, msg: str):
+        InfoBar.error(
+            title="ERROR",
+            content=msg,
+            position=InfoBarPosition.TOP,
+            parent=self
+        )
+
     def set_current_img(self, file_path):
         self.result_label.setText("")
+        self.confidence_score_figure.clear()
         if file_path:
             self.current_img = file_path
             image = QPixmap(file_path).scaled(

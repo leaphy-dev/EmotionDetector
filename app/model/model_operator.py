@@ -249,14 +249,6 @@ class ModelOperator:
         return prob_dict
 
 
-    def predict_webcam(self,model, image):
-        """处理摄像头输入"""
-        if image is None:
-            return None
-
-        result_img, result_text = self.predict_image(model, image)
-        return result_img, result_text
-
 if __name__ == "__main__":
     model_op = ModelOperator()
     model_op.train_model(epochs=5, model_class=EmotionCNNModel1, model_path="../../model_data/EmotionCNNModel1.pth")
